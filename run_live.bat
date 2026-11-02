@@ -6,3 +6,4 @@ echo ========================================================
 start http://localhost:8000
 python iot_asr_demo.py live
 pause
+
