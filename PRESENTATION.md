@@ -65,3 +65,4 @@ ASR          118.1     4.9   96.4+/-3.8   34.7+/-3.7   0.330          0.1   <- p
 - **Figure 1 (`figures/fig1_energy_breakdown.svg`)**: Visualizes the energy stack (sleep floor vs sensing vs radio transmission).
 - **Figure 2 (`figures/fig2_tradeoff_curves.svg`)**: Shows the Pareto trade-off frontiers for Delay vs Energy and RMSE vs Energy.
 - **Figure 3 (`figures/fig3_block_diagram.svg`)**: System block diagram of the sensor sampling and adaptive decision loop.
+
