@@ -41,5 +41,8 @@ Derived: F60/ASR energy ratio ≈ 4.6×; JSON vs CBOR energy per message: 18.6 v
 - Works offline; no console errors; keyboard-operable sliders.
 
 ## 5. Final checklist before presenting
-- [ ] `experiment` table matches §3  [ ] `demo` runs in < 10 s  [ ] README steps work on a clean machine
-- [ ] No hard-coded results in code  [ ] Assumptions stated in code comments and in the paper
+- [x] `experiment` table matches §3
+- [x] `demo` runs in < 10 s (actual: ~0.71 s)
+- [x] README steps work on a clean machine
+- [x] No hard-coded results in code
+- [x] Assumptions stated in code comments and in the paper
