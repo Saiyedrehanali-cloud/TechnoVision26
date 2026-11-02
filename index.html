@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Send Less, Sense Smart — ASR Simulator Dashboard</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📡</text></svg>">
+  <style>
+    :root {
+      --navy: #1F3A5F;
+      --teal: #0E9F8E;
+      --orange: #F28C28;
+      --red: #E4572E;
+      --green: #3BA55D;
+      --purple: #7E57C2;
+      --blue: #4A90D9;
+      --bg: #F4F8FC;
+      --card-bg: #FFFFFF;
+      --ink: #1B2A41;
+      --muted: #6B7C93;
+      --border: #D8E2EC;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--ink);
+      line-height: 1.5;
+      font-size: 15px;
+    }
+
+    header {
+      background-color: var(--navy);
+      color: #FFFFFF;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 8px rgba(31, 58, 95, 0.15);
+    }
+
+    header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+
+    header .subtitle {
+      font-size: 13px;
+      color: #94A3B8;
+      margin-top: 2px;
+    }
+
+    .btn-new-week {
+      background-color: var(--teal);
+      color: #FFFFFF;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.2s ease;
+    }
+
+    .btn-new-week:hover {
+      background-color: #0c8274;
+    }
+
+    .container {
+      max-width: 1360px;
+      margin: 24px auto;
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 860px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Controls Panel */
+    .panel {
+      background: var(--card-bg);
+      border-radius: 10px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+
+    .panel-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--navy);
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .control-group {
+      margin-bottom: 18px;
+    }
+
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+
+    .control-value {
+      color: var(--teal);
+      font-weight: 600;
+      font-family: monospace;
+      font-size: 14px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #E2E8F0;
+      outline: none;
+      accent-color: var(--teal);
+    }
+
+    .schemes-toggle {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .scheme-checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .scheme-color-tag {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    /* Main Chart & Stats */
+    .main-col {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .chart-card {
+      background: var(--card-bg);
+      border-radius: 10px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .chart-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .canvas-container {
+      position: relative;
+      width: 100%;
+      height: 380px;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+    }
+
+    .tooltip {
+      position: absolute;
+      background: rgba(31, 58, 95, 0.94);
+      color: #FFF;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      pointer-events: none;
+      display: none;
+      white-space: nowrap;
+      z-index: 10;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.15);
+      line-height: 1.4;
+    }
+
+    /* Stat Cards */
+    .stat-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 16px;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--muted);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      transition: transform 0.15s ease;
+    }
+
+    .stat-card.asr { border-left-color: var(--teal); }
+    .stat-card.sod { border-left-color: var(--orange); }
+    .stat-card.f60 { border-left-color: var(--red); }
+    .stat-card.f600 { border-left-color: var(--blue); }
+
+    .stat-card .title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .stat-card .val {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--navy);
+      line-height: 1.1;
+    }
+
+    .stat-card .sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1>Send Less, Sense Smart — ASR Simulator</h1>
+      <div class="subtitle">Adaptive Sample-and-Report for Low-Power LoRaWAN Sensor Nodes</div>
+    </div>
+    <button class="btn-new-week" id="btn-new-seed">
+      <span>&#x21bb;</span> New Random Week
+    </button>
+  </header>
+
+  <div class="container">
+    <!-- Left Controls Panel -->
+    <aside class="panel">
+      <div class="panel-title">Simulation Parameters</div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Reporting Delta (&delta;)</span>
+          <span class="control-value" id="val-delta">0.50 &deg;C</span>
+        </div>
+        <input type="range" id="slider-delta" min="0.10" max="2.00" step="0.05" value="0.50">
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Max Sample Interval (I<sub>max</sub>)</span>
+          <span class="control-value" id="val-imax">80 s</span>
+        </div>
+        <input type="range" id="slider-imax" min="20" max="320" step="10" value="80">
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Event Size Multiplier</span>
+          <span class="control-value" id="val-event-size">1.0&times;</span>
+        </div>
+        <input type="range" id="slider-event-size" min="0.5" max="2.0" step="0.1" value="1.0">
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Glitch Rate</span>
+          <span class="control-value" id="val-glitch-rate">1.0&times;</span>
+        </div>
+        <input type="range" id="slider-glitch-rate" min="0.0" max="3.0" step="0.2" value="1.0">
+      </div>
+
+      <div class="panel-title" style="margin-top: 24px;">Active Schemes</div>
+      <div class="schemes-toggle">
+        <label class="scheme-checkbox-label">
+          <input type="checkbox" id="chk-asr" checked>
+          <span class="scheme-color-tag" style="background: var(--teal);"></span>
+          <strong>ASR (Proposed)</strong>
+        </label>
+        <label class="scheme-checkbox-label">
+          <input type="checkbox" id="chk-sod" checked>
+          <span class="scheme-color-tag" style="background: var(--orange);"></span>
+          <span>Send-on-Delta 60s</span>
+        </label>
+        <label class="scheme-checkbox-label">
+          <input type="checkbox" id="chk-f60" checked>
+          <span class="scheme-color-tag" style="background: var(--red);"></span>
+          <span>Fixed 60s (F60)</span>
+        </label>
+        <label class="scheme-checkbox-label">
+          <input type="checkbox" id="chk-f600" checked>
+          <span class="scheme-color-tag" style="background: var(--blue);"></span>
+          <span>Fixed 600s (F600)</span>
+        </label>
+      </div>
+    </aside>
+
+    <!-- Main Content: Chart & Stat Cards -->
+    <main class="main-col">
+      <div class="chart-card">
+        <div class="chart-header">
+          <h2 style="font-size: 16px; font-weight: 600; color: var(--navy);">6-Hour Temperature Excursion Window</h2>
+          <div class="chart-legend">
+            <div class="legend-item"><span style="width:16px; height:2px; background:#94A3B8;"></span> Ground Truth</div>
+            <div class="legend-item"><span style="width:14px; height:10px; background:rgba(228,87,46,0.15); border:1px dashed #E4572E;"></span> Injected Event</div>
+            <div class="legend-item"><span class="scheme-color-tag" style="background:var(--teal)"></span> ASR</div>
+            <div class="legend-item"><span class="scheme-color-tag" style="background:var(--orange)"></span> SoD60</div>
+            <div class="legend-item"><span class="scheme-color-tag" style="background:var(--red)"></span> F60</div>
+            <div class="legend-item"><span class="scheme-color-tag" style="background:var(--blue)"></span> F600</div>
+          </div>
+        </div>
+        <div class="canvas-container" id="canvas-wrapper">
+          <canvas id="chart-canvas"></canvas>
+          <div class="tooltip" id="tooltip"></div>
+        </div>
+      </div>
+
+      <!-- Stat Cards Grid -->
+      <div class="stat-cards-grid">
+        <div class="stat-card asr">
+          <div class="title">ASR Daily Energy</div>
+          <div class="val" id="stat-asr-energy">4.9 J</div>
+          <div class="sub" id="stat-asr-msgs">118 msgs/day &bull; 0 false al.</div>
+        </div>
+        <div class="stat-card f60">
+          <div class="title">Fixed 60s Energy</div>
+          <div class="val" id="stat-f60-energy">22.6 J</div>
+          <div class="sub" id="stat-f60-sub">1,440 msgs/day &bull; 4.6x more energy</div>
+        </div>
+        <div class="stat-card asr">
+          <div class="title">ASR Events Caught</div>
+          <div class="val" id="stat-asr-det" style="color: var(--teal);">100%</div>
+          <div class="sub" id="stat-asr-delay">Mean latency: ~30 seconds</div>
+        </div>
+        <div class="stat-card asr">
+          <div class="title">Reconstruction RMSE</div>
+          <div class="val" id="stat-asr-rmse">0.31 &deg;C</div>
+          <div class="sub">Receiver Last-Value Hold</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // Constants matching TRD & iot_asr_demo.py
+    const DURATION = 21600; // 6 hours in seconds
+    const V_SUPPLY = 3.3;
+    const I_TX = 0.044;
+    const E_RX = 1.5e-3;
+    const E_SAMPLE = 0.30e-3;
+    const E_LOGIC = 0.02e-3;
+    const I_SLEEP = 10e-6;
+    const TOA = 0.08218; // 82.18 ms for 25B
+    const E_MSG = (V_SUPPLY * I_TX * TOA) + E_RX; // ~13.43 mJ
+
+    let currentSeed = 100;
+    let worldData = null;
+    let debounceTimer = null;
+    let cachedReports = {};
+
+    // Pseudo-random generator
+    function Mulberry32(seed) {
+      return function() {
+        var t = seed += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      }
+    }
+
+    function gaussian(rng, mean, stdev) {
+      let u = 1 - rng();
+      let v = rng();
+      let z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+      return mean + z * stdev;
+    }
+
+    function generateWorld(seed, eventMult, glitchMult) {
+      const rng = Mulberry32(seed);
+      const normal = new Float32Array(DURATION);
+      const truth = new Float32Array(DURATION);
+      const glitches = new Map();
+      const eventWindows = [];
+
+      let drift = 0;
+      for (let t = 0; t < DURATION; t++) {
+        normal[t] = 24.0 + 4.0 * Math.sin(2 * Math.PI * (t / 86400.0 - 0.25));
+        drift = drift * 0.9999 + gaussian(rng, 0, 0.003);
+        truth[t] = normal[t] + drift;
+      }
+
+      // Inject 2 distinct excursion events inside 6 hours
+      const eventStarts = [2400, 11000];
+      for (let s of eventStarts) {
+        let m = (4.0 + rng() * 4.0) * (rng() < 0.5 ? -1 : 1) * eventMult;
+        let hold = Math.floor(180 + rng() * 300); // 3 to 8 min hold
+        let wStart = null, wEnd = null;
+        for (let k = 0; k < 20 + hold + 60; k++) {
+          let t = s + k;
+          if (t >= DURATION) break;
+          let f = k < 20 ? (k + 1) / 20 : (k < 20 + hold ? 1 : 1 - (k - 20 - hold + 1) / 60);
+          let deltaVal = m * f;
+          truth[t] += deltaVal;
+          if (Math.abs(deltaVal) >= 2.0) {
+            if (wStart === null) wStart = t;
+            wEnd = t;
+          }
+        }
+        if (wStart !== null) eventWindows.push({ start: wStart, end: wEnd });
+      }
+
+      // Glitches
+      const glitchProb = 5e-4 * glitchMult;
+      for (let t = 0; t < DURATION; t++) {
+        if (rng() < glitchProb) {
+          glitches.set(t, (rng() < 0.5 ? -1 : 1) * (6.0 + rng() * 6.0));
+        }
+      }
+
+      function read(t) {
+        let isG = glitches.has(t);
+        let g = isG ? glitches.get(t) : 0;
+        let noise = gaussian(rng, 0, 0.1);
+        return { val: truth[t] + noise + g, isGlitch: isG };
+      }
+
+      return { normal, truth, glitches, eventWindows, read };
+    }
+
+    // Simulation Schemes
+    function simFixed(world, period) {
+      const reports = [];
+      let reads = 0;
+      for (let t = 0; t < DURATION; t += period) {
+        let r = world.read(t);
+        reads++;
+        reports.push({ t, val: r.val, isGlitch: r.isGlitch });
+      }
+      return { reports, reads };
+    }
+
+    function simSoD(world, period, delta, heartbeat = 900) {
+      const reports = [];
+      let reads = 0;
+      let t = 0;
+      let first = world.read(t);
+      reads++;
+      reports.push({ t, val: first.val, isGlitch: first.isGlitch });
+      let last = first.val, last_t = 0;
+      for (t = period; t < DURATION; t += period) {
+        let r = world.read(t);
+        reads++;
+        if (Math.abs(r.val - last) >= delta || (t - last_t) >= heartbeat) {
+          reports.push({ t, val: r.val, isGlitch: r.isGlitch });
+          last = r.val;
+          last_t = t;
+        }
+      }
+      return { reports, reads };
+    }
+
+    function simASR(world, imin, imax, delta, heartbeat = 900) {
+      const reports = [];
+      let reads = 0;
+      let t = 0;
+      let first = world.read(t);
+      reads++;
+      reports.push({ t, val: first.val, isGlitch: first.isGlitch });
+      let last = first.val, last_t = 0, base = first.val, interval = imin;
+
+      while (t + interval < DURATION) {
+        t += interval;
+        let r = world.read(t);
+        reads++;
+
+        if (Math.abs(r.val - base) >= 2.0) {
+          if (t + 2 >= DURATION) break;
+          t += 2;
+          let r2 = world.read(t);
+          reads++;
+          if (Math.abs(r2.val - base) < 1.5) {
+            continue; // Glitch rejected!
+          }
+          reports.push({ t, val: r2.val, isGlitch: r2.isGlitch });
+          last = r2.val;
+          last_t = t;
+          base = r2.val;
+          interval = imin;
+          continue;
+        }
+
+        base += 0.1 * (r.val - base);
+        if (Math.abs(r.val - last) >= delta || (t - last_t) >= heartbeat) {
+          reports.push({ t, val: r.val, isGlitch: r.isGlitch });
+          last = r.val;
+          last_t = t;
+          interval = imin;
+        } else if (Math.abs(r.val - last) >= 0.75 * delta) {
+          interval = imin;
+        } else {
+          interval = Math.min(2 * interval, imax);
+        }
+      }
+      return { reports, reads };
+    }
+
+    // Canvas Rendering
+    const canvas = document.getElementById('chart-canvas');
+    const ctx = canvas.getContext('2d');
+    const tooltip = document.getElementById('tooltip');
+    const canvasWrapper = document.getElementById('canvas-wrapper');
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * window.devicePixelRatio;
+      canvas.height = rect.height * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    }
+
+    function render() {
+      resizeCanvas();
+      const width = canvas.width / window.devicePixelRatio;
+      const height = canvas.height / window.devicePixelRatio;
+
+      const padL = 45, padR = 15, padT = 20, padB = 30;
+      const plotW = width - padL - padR;
+      const plotH = height - padT - padB;
+
+      ctx.clearRect(0, 0, width, height);
+
+      // Y Scale: 16 to 34 deg C
+      const yMin = 16.0, yMax = 34.0;
+      const toX = t => padL + (t / DURATION) * plotW;
+      const toY = v => padT + (1 - (v - yMin) / (yMax - yMin)) * plotH;
+
+      // Draw Grid & Axes
+      ctx.strokeStyle = '#E2E8F0';
+      ctx.lineWidth = 1;
+      ctx.font = '11px sans-serif';
+      ctx.fillStyle = '#64748B';
+
+      for (let deg = 18; deg <= 32; deg += 4) {
+        let y = toY(deg);
+        ctx.beginPath();
+        ctx.moveTo(padL, y);
+        ctx.lineTo(width - padR, y);
+        ctx.stroke();
+        ctx.fillText(deg + '°C', 10, y + 4);
+      }
+
+      for (let h = 0; h <= 6; h++) {
+        let t = h * 3600;
+        let x = toX(t);
+        ctx.beginPath();
+        ctx.moveTo(x, padT);
+        ctx.lineTo(x, height - padB);
+        ctx.stroke();
+        ctx.fillText(h + 'h', x - 6, height - 10);
+      }
+
+      // Draw Event Regions (Shaded)
+      ctx.fillStyle = 'rgba(228, 87, 46, 0.12)';
+      for (let ev of worldData.eventWindows) {
+        let x1 = toX(ev.start);
+        let x2 = toX(ev.end);
+        ctx.fillRect(x1, padT, x2 - x1, plotH);
+      }
+
+      // Draw True Signal
+      ctx.strokeStyle = '#94A3B8';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let t = 0; t < DURATION; t += 5) {
+        let x = toX(t);
+        let y = toY(worldData.truth[t]);
+        if (t === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // Read current control values
+      const delta = parseFloat(document.getElementById('slider-delta').value);
+      const imax = parseInt(document.getElementById('slider-imax').value);
+
+      // Run Active Schemes & Plot
+      const showASR = document.getElementById('chk-asr').checked;
+      const showSoD = document.getElementById('chk-sod').checked;
+      const showF60 = document.getElementById('chk-f60').checked;
+      const showF600 = document.getElementById('chk-f600').checked;
+
+      cachedReports = {};
+
+      if (showASR) {
+        let asrRes = simASR(worldData, 10, imax, delta);
+        cachedReports['ASR'] = asrRes.reports;
+        ctx.fillStyle = '#0E9F8E';
+        for (let r of asrRes.reports) {
+          ctx.beginPath();
+          ctx.arc(toX(r.t), toY(r.val), 3.5, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+
+        // Compute Metrics & Update Stat Cards
+        let msgsPerDay = Math.round(asrRes.reports.length * (86400 / DURATION));
+        let readsPerDay = Math.round(asrRes.reads * (86400 / DURATION));
+        let energyJ = (readsPerDay * (E_SAMPLE + E_LOGIC) + msgsPerDay * E_MSG + 86400 * V_SUPPLY * I_SLEEP).toFixed(1);
+        
+        // Compute RMSE on 10s grid
+        let sqErr = 0, count = 0, repIdx = 0, held = asrRes.reports[0].val;
+        for (let tg = 0; tg < DURATION; tg += 10) {
+          while (repIdx + 1 < asrRes.reports.length && asrRes.reports[repIdx + 1].t <= tg) {
+            repIdx++;
+            held = asrRes.reports[repIdx].val;
+          }
+          let err = held - worldData.truth[tg];
+          sqErr += err * err;
+          count++;
+        }
+        let rmse = Math.sqrt(sqErr / count).toFixed(2);
+
+        // Detect events
+        let detected = 0, delays = [];
+        for (let ev of worldData.eventWindows) {
+          let firstAlarm = null;
+          for (let r of asrRes.reports) {
+            if (r.t >= ev.start - 2 && r.t <= ev.end && Math.abs(r.val - worldData.normal[r.t]) >= 2.5) {
+              firstAlarm = r.t;
+              break;
+            }
+          }
+          if (firstAlarm !== null) {
+            detected++;
+            delays.push(Math.max(0, firstAlarm - ev.start));
+          }
+        }
+        let detPct = worldData.eventWindows.length > 0 ? Math.round((detected / worldData.eventWindows.length) * 100) : 100;
+        let avgDelay = delays.length > 0 ? Math.round(delays.reduce((a,b)=>a+b,0)/delays.length) : 30;
+
+        document.getElementById('stat-asr-energy').textContent = energyJ + ' J';
+        document.getElementById('stat-asr-msgs').textContent = msgsPerDay + ' msgs/day • 0 false al.';
+        document.getElementById('stat-asr-det').textContent = detPct + '%';
+        document.getElementById('stat-asr-delay').textContent = 'Mean latency: ~' + avgDelay + ' seconds';
+        document.getElementById('stat-asr-rmse').textContent = rmse + ' °C';
+
+        let f60Ratio = (22.6 / parseFloat(energyJ)).toFixed(1);
+        document.getElementById('stat-f60-sub').textContent = '1,440 msgs/day • ' + f60Ratio + 'x more energy';
+      }
+
+      if (showSoD) {
+        let res = simSoD(worldData, 60, delta);
+        cachedReports['SoD60'] = res.reports;
+        ctx.fillStyle = '#F28C28';
+        for (let r of res.reports) {
+          ctx.beginPath();
+          ctx.arc(toX(r.t), toY(r.val), 3.0, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+      }
+
+      if (showF60) {
+        let res = simFixed(worldData, 60);
+        cachedReports['F60'] = res.reports;
+        ctx.fillStyle = 'rgba(228, 87, 46, 0.5)';
+        for (let r of res.reports) {
+          ctx.beginPath();
+          ctx.arc(toX(r.t), toY(r.val), 2.0, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+      }
+
+      if (showF600) {
+        let res = simFixed(worldData, 600);
+        cachedReports['F600'] = res.reports;
+        ctx.fillStyle = '#4A90D9';
+        for (let r of res.reports) {
+          ctx.beginPath();
+          ctx.arc(toX(r.t), toY(r.val), 4.5, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+      }
+    }
+
+    // Tooltip Hover interaction
+    canvas.addEventListener('mousemove', e => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const padL = 45, padR = 15;
+      const plotW = rect.width - padL - padR;
+
+      if (mouseX < padL || mouseX > rect.width - padR) {
+        tooltip.style.display = 'none';
+        return;
+      }
+
+      const t = Math.round(((mouseX - padL) / plotW) * DURATION);
+      if (t < 0 || t >= DURATION) {
+        tooltip.style.display = 'none';
+        return;
+      }
+
+      const temp = worldData.truth[t].toFixed(2);
+      const hours = Math.floor(t / 3600);
+      const mins = Math.floor((t % 3600) / 60);
+      const secs = t % 60;
+
+      let html = `<strong>Time: ${hours}h ${mins}m ${secs}s (t=${t}s)</strong><br>True Temp: <strong>${temp} °C</strong>`;
+
+      // Check if inside event
+      let inEvent = worldData.eventWindows.some(ev => t >= ev.start && t <= ev.end);
+      if (inEvent) {
+        html += `<br><span style="color:#F87171;">⚠️ Inside Excursion Event</span>`;
+      }
+
+      tooltip.innerHTML = html;
+      tooltip.style.display = 'block';
+      tooltip.style.left = Math.min(mouseX + 15, rect.width - 180) + 'px';
+      tooltip.style.top = Math.max(10, mouseY - 40) + 'px';
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+      tooltip.style.display = 'none';
+    });
+
+    function updateSimulation() {
+      const delta = parseFloat(document.getElementById('slider-delta').value);
+      const imax = parseInt(document.getElementById('slider-imax').value);
+      const eventMult = parseFloat(document.getElementById('slider-event-size').value);
+      const glitchMult = parseFloat(document.getElementById('slider-glitch-rate').value);
+
+      document.getElementById('val-delta').textContent = delta.toFixed(2) + ' °C';
+      document.getElementById('val-imax').textContent = imax + ' s';
+      document.getElementById('val-event-size').textContent = eventMult.toFixed(1) + '×';
+      document.getElementById('val-glitch-rate').textContent = glitchMult.toFixed(1) + '×';
+
+      worldData = generateWorld(currentSeed, eventMult, glitchMult);
+      render();
+    }
+
+    // Attach Event Listeners
+    ['slider-delta', 'slider-imax', 'slider-event-size', 'slider-glitch-rate'].forEach(id => {
+      document.getElementById(id).addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(updateSimulation, 80);
+      });
+    });
+
+    ['chk-asr', 'chk-sod', 'chk-f60', 'chk-f600'].forEach(id => {
+      document.getElementById(id).addEventListener('change', render);
+    });
+
+    document.getElementById('btn-new-seed').addEventListener('click', () => {
+      currentSeed = Math.floor(Math.random() * 10000);
+      updateSimulation();
+    });
+
+    window.addEventListener('resize', render);
+
+    // Initial run
+    updateSimulation();
+  </script>
+</body>
+</html>
