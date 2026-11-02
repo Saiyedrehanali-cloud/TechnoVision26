@@ -158,3 +158,4 @@ Adaptive Sample-and-Report (ASR) resolves the classic trade-off between energy c
 2. C. Bormann et al., *RFC 8428: Sensor Measurement Lists (SenML)*, IETF RFC, 2018.
 3. C. Bormann and P. Hoffman, *RFC 8949: Concise Binary Object Representation (CBOR)*, IETF RFC, 2020.
 4. J. M. M. et al., "Event-Triggered and Self-Triggered Control: A Review," *IEEE Trans. Automat. Contr.*, 2012.
+
