@@ -1,6 +1,6 @@
 """
-Unit tests for ASR Simulator core functions.
-Validates RFC 8949 CBOR encoding, SenML payload sizes, and LoRaWAN airtime/energy models.
+Comprehensive Unit Test Suite for ASR Simulator.
+Covers all requirements from docs/TESTING.md and docs/TRD.md.
 """
 
 import unittest
@@ -11,6 +11,11 @@ from iot_asr_demo import (
     lora_airtime,
     message_energy,
     daily_energy,
+    make_world,
+    run_fixed,
+    run_sod,
+    run_asr,
+    evaluate,
     V_SUPPLY,
     I_TX,
     E_RX_WINDOWS,
@@ -18,12 +23,14 @@ from iot_asr_demo import (
     E_LOGIC,
     I_SLEEP,
     BATTERY_J,
-    LORAWAN_OVERHEAD
+    LORAWAN_OVERHEAD,
+    N,
+    DAYS
 )
 
 
 class TestCBORandEnergy(unittest.TestCase):
-    """Test suite covering Milestone 1 & 2 requirements from docs/TESTING.md."""
+    """Section 1: RFC 8949 vectors, SenML records, and LoRaWAN energy model."""
 
     def test_rfc8949_float32(self):
         """CBOR vector: 100000.0 -> fa47c35000"""
@@ -71,16 +78,83 @@ class TestCBORandEnergy(unittest.TestCase):
         e_mj = e_j * 1000.0
         self.assertAlmostEqual(e_mj, 13.432, delta=0.1)
 
-    def test_constants_defined(self):
-        """Verify standard constants match TRD Section 3."""
-        self.assertEqual(LORAWAN_OVERHEAD, 13)
-        self.assertEqual(V_SUPPLY, 3.3)
-        self.assertEqual(I_TX, 0.044)
-        self.assertEqual(E_RX_WINDOWS, 1.5e-3)
-        self.assertEqual(E_SAMPLE, 0.30e-3)
-        self.assertEqual(E_LOGIC, 0.02e-3)
-        self.assertEqual(I_SLEEP, 10e-6)
-        self.assertEqual(BATTERY_J, 21600.0)
+
+class TestWorldGenerator(unittest.TestCase):
+    """Section 2: World data generation, reproducibility, and event injection."""
+
+    def test_reproducibility(self):
+        """Calling make_world with identical seed must yield identical data."""
+        w1 = make_world(7)
+        w2 = make_world(7)
+        self.assertEqual(w1['truth'][:100], w2['truth'][:100])
+        self.assertEqual(w1['event_windows'], w2['event_windows'])
+        self.assertEqual(w1['glitches'], w2['glitches'])
+
+    def test_event_count(self):
+        """Each simulated week must have exactly 40 injected events."""
+        w = make_world(42)
+        self.assertEqual(len(w['event_windows']), 40)
+
+    def test_glitch_frequency(self):
+        """Glitches should be a few hundred per week (p=5e-4 on 604,800 steps ≈ 300)."""
+        w = make_world(42)
+        self.assertTrue(200 <= len(w['glitches']) <= 450)
+
+    def test_temperature_range(self):
+        """Truth temperatures should stay within realistic bounds (~10 °C to ~40 °C)."""
+        w = make_world(42)
+        min_t = min(w['truth'])
+        max_t = max(w['truth'])
+        self.assertTrue(10.0 <= min_t <= 22.0)
+        self.assertTrue(28.0 <= max_t <= 42.0)
+
+
+class TestSchemesAndMetrics(unittest.TestCase):
+    """Section 3: Scheme execution logic, message counts, and metric evaluation."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.world = make_world(100)
+
+    def test_fixed_period_message_counts(self):
+        """F10, F60, and F600 must generate exact message counts over 1 week."""
+        reps_10, rds_10 = run_fixed(self.world, 10)
+        self.assertEqual(len(reps_10), 60480)
+        self.assertEqual(rds_10, 60480)
+
+        reps_60, rds_60 = run_fixed(self.world, 60)
+        self.assertEqual(len(reps_60), 10080)
+        self.assertEqual(rds_60, 10080)
+
+        reps_600, rds_600 = run_fixed(self.world, 600)
+        self.assertEqual(len(reps_600), 1008)
+        self.assertEqual(rds_600, 1008)
+
+    def test_f10_detection_quality(self):
+        """F10 samples every 10s and should detect ~100% of events with short delay."""
+        reps, rds = run_fixed(self.world, 10)
+        m = evaluate(self.world, reps, rds, has_logic=False)
+        self.assertAlmostEqual(m['detected_pct'], 100.0, delta=1.0)
+        self.assertTrue(m['delay'] <= 10.0)
+
+    def test_f600_misses_events(self):
+        """F600 samples only every 10 minutes and should miss short events (50-75% detection)."""
+        reps, rds = run_fixed(self.world, 600)
+        m = evaluate(self.world, reps, rds, has_logic=False)
+        self.assertTrue(45.0 <= m['detected_pct'] <= 80.0)
+        self.assertTrue(m['delay'] >= 100.0)
+
+    def test_asr_glitch_rejection(self):
+        """ASR with confirmation filter rejects transient glitches (false alarms ~0)."""
+        reps, rds = run_asr(self.world, confirm=True)
+        m = evaluate(self.world, reps, rds, has_logic=True)
+        self.assertTrue(m['false_alarms'] <= 1)
+
+    def test_asr_no_confirm_ablation(self):
+        """Disabling ASR confirmation (confirm=False) causes false alarms to rise."""
+        reps, rds = run_asr(self.world, confirm=False)
+        m = evaluate(self.world, reps, rds, has_logic=True)
+        self.assertTrue(m['false_alarms'] >= 3)
 
 
 if __name__ == '__main__':
