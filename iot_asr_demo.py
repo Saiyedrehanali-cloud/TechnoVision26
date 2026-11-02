@@ -725,12 +725,47 @@ def run_demo(seed: int = 100) -> None:
     print("Takeaway: ASR cuts energy by 4.6x compared to F60 while catching 97%+ of events with 0 false alarms.")
 
 
+def run_live_server(port: int = 8000) -> None:
+    """
+    Launch the live interactive web dashboard on a local HTTP server
+    and open it in the default web browser.
+    """
+    import http.server
+    import os
+    import socketserver
+    import webbrowser
+
+    dashboard_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard")
+    os.chdir(dashboard_dir)
+
+    handler = http.server.SimpleHTTPRequestHandler
+    
+    print(f"\n=======================================================")
+    print(f"  ASR Simulator -- Live Interactive Dashboard")
+    print(f"  URL: http://localhost:{port}")
+    print(f"  Serving directory: {dashboard_dir}")
+    print(f"  Press Ctrl+C to stop the server.")
+    print(f"=======================================================\n")
+
+    # Automatically open browser
+    try:
+        webbrowser.open(f"http://localhost:{port}")
+    except Exception:
+        pass
+
+    try:
+        with socketserver.TCPServer(("", port), handler) as httpd:
+            httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("\nServer stopped.")
+
+
 # ==============================================================================
 # 9. CLI ENTRY POINT (APP_FLOW Section 1)
 # ==============================================================================
 
 def main():
-    """CLI dispatcher supporting 'demo', 'experiment', 'tune', and self-test verification."""
+    """CLI dispatcher supporting 'demo', 'experiment', 'tune', 'live', and self-test verification."""
     args = sys.argv[1:]
     
     if len(args) == 0:
@@ -738,6 +773,8 @@ def main():
         run_experiment()
     elif args[0] == "demo":
         run_demo()
+    elif args[0] in ("live", "serve", "dashboard"):
+        run_live_server()
     elif args[0] == "experiment":
         run_experiment()
     elif args[0] == "tune":
@@ -746,6 +783,7 @@ def main():
         print("Usage: python iot_asr_demo.py [mode]")
         print("\nAvailable modes:")
         print("  demo        Quick readable story of one event and scheme comparison (< 5s)")
+        print("  live        Launch the live interactive web dashboard in your browser")
         print("  experiment  Full 30-week evaluation (seeds 100-129) -> saves results.json")
         print("  tune        Parameter grid sweep on training seeds 1-5")
         print("  (no args)   Defaults to 'experiment'")

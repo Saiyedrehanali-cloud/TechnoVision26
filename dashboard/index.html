@@ -204,20 +204,23 @@
       width: 100%;
       height: 100%;
       display: block;
+      cursor: crosshair;
     }
 
     .tooltip {
       position: absolute;
-      background: rgba(31, 58, 95, 0.92);
+      background: rgba(31, 58, 95, 0.94);
       color: #FFF;
-      padding: 6px 10px;
-      border-radius: 5px;
+      padding: 8px 12px;
+      border-radius: 6px;
       font-size: 12px;
       pointer-events: none;
       display: none;
       white-space: nowrap;
       z-index: 10;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.15);
+      line-height: 1.4;
     }
 
     /* Stat Cards */
@@ -369,17 +372,17 @@
         <div class="stat-card f60">
           <div class="title">Fixed 60s Energy</div>
           <div class="val" id="stat-f60-energy">22.6 J</div>
-          <div class="sub">1,440 msgs/day &bull; 4.6x more energy</div>
+          <div class="sub" id="stat-f60-sub">1,440 msgs/day &bull; 4.6x more energy</div>
         </div>
         <div class="stat-card asr">
           <div class="title">ASR Events Caught</div>
-          <div class="val" id="stat-asr-det" style="color: var(--teal);">97.2%</div>
-          <div class="sub">Mean delay: ~33 seconds</div>
+          <div class="val" id="stat-asr-det" style="color: var(--teal);">100%</div>
+          <div class="sub" id="stat-asr-delay">Mean latency: ~30 seconds</div>
         </div>
         <div class="stat-card asr">
           <div class="title">Reconstruction RMSE</div>
-          <div class="val" id="stat-asr-rmse">0.32 &deg;C</div>
-          <div class="sub">Receiver last-value hold</div>
+          <div class="val" id="stat-asr-rmse">0.31 &deg;C</div>
+          <div class="sub">Receiver Last-Value Hold</div>
         </div>
       </div>
     </main>
@@ -400,8 +403,9 @@
     let currentSeed = 100;
     let worldData = null;
     let debounceTimer = null;
+    let cachedReports = {};
 
-    // Simple pseudo-random generator
+    // Pseudo-random generator
     function Mulberry32(seed) {
       return function() {
         var t = seed += 0x6D2B79F5;
@@ -551,6 +555,7 @@
     const canvas = document.getElementById('chart-canvas');
     const ctx = canvas.getContext('2d');
     const tooltip = document.getElementById('tooltip');
+    const canvasWrapper = document.getElementById('canvas-wrapper');
 
     function resizeCanvas() {
       const rect = canvas.getBoundingClientRect();
@@ -630,19 +635,67 @@
       const showF60 = document.getElementById('chk-f60').checked;
       const showF600 = document.getElementById('chk-f600').checked;
 
-      let asrRes = null;
+      cachedReports = {};
+
       if (showASR) {
-        asrRes = simASR(worldData, 10, imax, delta);
+        let asrRes = simASR(worldData, 10, imax, delta);
+        cachedReports['ASR'] = asrRes.reports;
         ctx.fillStyle = '#0E9F8E';
         for (let r of asrRes.reports) {
           ctx.beginPath();
           ctx.arc(toX(r.t), toY(r.val), 3.5, 0, 2 * Math.PI);
           ctx.fill();
         }
+
+        // Compute Metrics & Update Stat Cards
+        let msgsPerDay = Math.round(asrRes.reports.length * (86400 / DURATION));
+        let readsPerDay = Math.round(asrRes.reads * (86400 / DURATION));
+        let energyJ = (readsPerDay * (E_SAMPLE + E_LOGIC) + msgsPerDay * E_MSG + 86400 * V_SUPPLY * I_SLEEP).toFixed(1);
+        
+        // Compute RMSE on 10s grid
+        let sqErr = 0, count = 0, repIdx = 0, held = asrRes.reports[0].val;
+        for (let tg = 0; tg < DURATION; tg += 10) {
+          while (repIdx + 1 < asrRes.reports.length && asrRes.reports[repIdx + 1].t <= tg) {
+            repIdx++;
+            held = asrRes.reports[repIdx].val;
+          }
+          let err = held - worldData.truth[tg];
+          sqErr += err * err;
+          count++;
+        }
+        let rmse = Math.sqrt(sqErr / count).toFixed(2);
+
+        // Detect events
+        let detected = 0, delays = [];
+        for (let ev of worldData.eventWindows) {
+          let firstAlarm = null;
+          for (let r of asrRes.reports) {
+            if (r.t >= ev.start - 2 && r.t <= ev.end && Math.abs(r.val - worldData.normal[r.t]) >= 2.5) {
+              firstAlarm = r.t;
+              break;
+            }
+          }
+          if (firstAlarm !== null) {
+            detected++;
+            delays.push(Math.max(0, firstAlarm - ev.start));
+          }
+        }
+        let detPct = worldData.eventWindows.length > 0 ? Math.round((detected / worldData.eventWindows.length) * 100) : 100;
+        let avgDelay = delays.length > 0 ? Math.round(delays.reduce((a,b)=>a+b,0)/delays.length) : 30;
+
+        document.getElementById('stat-asr-energy').textContent = energyJ + ' J';
+        document.getElementById('stat-asr-msgs').textContent = msgsPerDay + ' msgs/day • 0 false al.';
+        document.getElementById('stat-asr-det').textContent = detPct + '%';
+        document.getElementById('stat-asr-delay').textContent = 'Mean latency: ~' + avgDelay + ' seconds';
+        document.getElementById('stat-asr-rmse').textContent = rmse + ' °C';
+
+        let f60Ratio = (22.6 / parseFloat(energyJ)).toFixed(1);
+        document.getElementById('stat-f60-sub').textContent = '1,440 msgs/day • ' + f60Ratio + 'x more energy';
       }
 
       if (showSoD) {
         let res = simSoD(worldData, 60, delta);
+        cachedReports['SoD60'] = res.reports;
         ctx.fillStyle = '#F28C28';
         for (let r of res.reports) {
           ctx.beginPath();
@@ -653,6 +706,7 @@
 
       if (showF60) {
         let res = simFixed(worldData, 60);
+        cachedReports['F60'] = res.reports;
         ctx.fillStyle = 'rgba(228, 87, 46, 0.5)';
         for (let r of res.reports) {
           ctx.beginPath();
@@ -663,6 +717,7 @@
 
       if (showF600) {
         let res = simFixed(worldData, 600);
+        cachedReports['F600'] = res.reports;
         ctx.fillStyle = '#4A90D9';
         for (let r of res.reports) {
           ctx.beginPath();
@@ -670,16 +725,50 @@
           ctx.fill();
         }
       }
-
-      // Update Cards
-      if (asrRes) {
-        let msgsPerDay = Math.round(asrRes.reports.length * (86400 / DURATION));
-        let readsPerDay = Math.round(asrRes.reads * (86400 / DURATION));
-        let energyJ = (readsPerDay * (E_SAMPLE + E_LOGIC) + msgsPerDay * E_MSG + 86400 * V_SUPPLY * I_SLEEP).toFixed(1);
-        document.getElementById('stat-asr-energy').textContent = energyJ + ' J';
-        document.getElementById('stat-asr-msgs').textContent = msgsPerDay + ' msgs/day • 0 false al.';
-      }
     }
+
+    // Tooltip Hover interaction
+    canvas.addEventListener('mousemove', e => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const padL = 45, padR = 15;
+      const plotW = rect.width - padL - padR;
+
+      if (mouseX < padL || mouseX > rect.width - padR) {
+        tooltip.style.display = 'none';
+        return;
+      }
+
+      const t = Math.round(((mouseX - padL) / plotW) * DURATION);
+      if (t < 0 || t >= DURATION) {
+        tooltip.style.display = 'none';
+        return;
+      }
+
+      const temp = worldData.truth[t].toFixed(2);
+      const hours = Math.floor(t / 3600);
+      const mins = Math.floor((t % 3600) / 60);
+      const secs = t % 60;
+
+      let html = `<strong>Time: ${hours}h ${mins}m ${secs}s (t=${t}s)</strong><br>True Temp: <strong>${temp} °C</strong>`;
+
+      // Check if inside event
+      let inEvent = worldData.eventWindows.some(ev => t >= ev.start && t <= ev.end);
+      if (inEvent) {
+        html += `<br><span style="color:#F87171;">⚠️ Inside Excursion Event</span>`;
+      }
+
+      tooltip.innerHTML = html;
+      tooltip.style.display = 'block';
+      tooltip.style.left = Math.min(mouseX + 15, rect.width - 180) + 'px';
+      tooltip.style.top = Math.max(10, mouseY - 40) + 'px';
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+      tooltip.style.display = 'none';
+    });
 
     function updateSimulation() {
       const delta = parseFloat(document.getElementById('slider-delta').value);
@@ -720,4 +809,3 @@
   </script>
 </body>
 </html>
-
